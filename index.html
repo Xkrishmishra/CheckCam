@@ -3,149 +3,172 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Omni-Scanner AI</title>
+    <title>AI Human & Object Tracker</title>
     <style>
-        :root { --glow: #00ff9d; --bg: #050a0a; }
-        body { margin: 0; background: var(--bg); color: var(--glow); font-family: 'Segoe UI', monospace; overflow: hidden; }
+        :root { --accent: #ff3e3e; --guy: #00e5ff; --bg: #020505; }
+        body { margin: 0; background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
         
-        /* Layout */
         #main-ui { display: flex; width: 100vw; height: 100vh; }
-        #camera-section { position: relative; flex-grow: 1; border: 2px solid #1a332a; overflow: hidden; }
-        #report-sidebar { width: 300px; background: rgba(0, 20, 15, 0.9); border-left: 2px solid var(--glow); padding: 20px; overflow-y: auto; display: flex; flex-direction: column; }
+        #camera-section { position: relative; flex-grow: 1; background: #000; }
+        #report-sidebar { width: 380px; background: rgba(10, 15, 15, 0.95); border-left: 2px solid var(--guy); padding: 20px; overflow-y: auto; }
 
         video, canvas { position: absolute; width: 100%; height: 100%; object-fit: cover; }
 
-        /* Scanning Wave */
-        .wave {
-            position: absolute; width: 100%; height: 15px;
-            background: linear-gradient(to bottom, transparent, var(--glow), transparent);
-            box-shadow: 0 0 25px var(--glow);
-            z-index: 5; top: 0; animation: scan 4s infinite ease-in-out; opacity: 0.6; pointer-events: none;
+        /* Scanning Wave Animation */
+        .scan-wave {
+            position: absolute; width: 100%; height: 4px;
+            background: var(--guy); box-shadow: 0 0 20px var(--guy);
+            z-index: 10; top: 0; animation: scan 3s infinite linear; opacity: 0.7;
         }
-        @keyframes scan { 0% { top: 0%; } 50% { top: 100%; } 100% { top: 0%; } }
+        @keyframes scan { 0% { top: 0%; } 100% { top: 100%; } }
 
-        /* Guidance Overlay */
-        #overlay-ui {
-            position: absolute; top: 20px; left: 20px; z-index: 10;
-            background: rgba(0,0,0,0.6); padding: 10px; border-left: 3px solid var(--glow);
+        /* UI Overlays */
+        #hud {
+            position: absolute; top: 20px; left: 20px; z-index: 20;
+            background: rgba(0,0,0,0.8); border: 1px solid var(--guy);
+            padding: 15px; border-radius: 4px;
         }
 
-        /* Report Items */
-        .report-entry {
-            background: rgba(255,255,255,0.05); border: 1px solid #1a332a;
-            padding: 10px; margin-bottom: 10px; border-radius: 4px; font-size: 0.9rem;
-            animation: fadeIn 0.5s forwards;
+        /* Report Styling */
+        .report-card {
+            background: rgba(255,255,255,0.05); border-left: 4px solid var(--guy);
+            padding: 12px; margin-bottom: 10px; animation: fadeIn 0.3s;
         }
-        @keyframes fadeIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+        .status-arrival { border-left-color: #00ff88; color: #00ff88; font-weight: bold; }
+        .status-departure { border-left-color: #ff3e3e; color: #ff3e3e; font-weight: bold; }
 
-        /* Start Screen */
-        #start-screen {
+        .shop-link {
+            display: inline-block; margin-top: 8px; color: var(--guy); 
+            text-decoration: none; font-size: 0.8rem; border: 1px solid var(--guy);
+            padding: 4px 8px; border-radius: 3px;
+        }
+
+        #boot-screen {
             position: fixed; inset: 0; background: var(--bg); z-index: 100;
-            display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
         }
-        button {
-            background: transparent; border: 2px solid var(--glow); color: var(--glow);
-            padding: 15px 30px; cursor: pointer; font-weight: bold; text-transform: uppercase;
-            margin-top: 20px; transition: 0.3s;
+        .btn {
+            background: transparent; border: 2px solid var(--guy); color: var(--guy);
+            padding: 15px 30px; cursor: pointer; font-weight: bold;
         }
-        button:hover { background: var(--glow); color: black; }
     </style>
 </head>
 <body>
 
-    <div id="start-screen">
-        <h1>OMNI-SCANNER v3.0</h1>
-        <p>I am your AI guidance system. I will identify objects and generate a retail-grade report.</p>
-        <p style="color: #888;">System requires camera access to begin analysis.</p>
-        <button onclick="startSystem()">Initialize Scanner</button>
-    </div>
+<div id="boot-screen">
+    <h1 style="color: var(--guy); letter-spacing: 3px;">AI SURVEILLANCE & RETAIL</h1>
+    <p>Tracking Humans, Animals, and Objects in Real-Time</p>
+    <button class="btn" onclick="startScanner()">INITIALIZE SYSTEM</button>
+</div>
 
-    <div id="main-ui">
-        <div id="camera-section">
-            <div class="wave"></div>
-            <video id="webcam" autoplay muted playsinline></video>
-            <canvas id="overlay"></canvas>
-            <div id="overlay-ui">
-                <div id="status">STATUS: STANDBY</div>
-                <div id="target" style="font-size: 1.5rem; font-weight: bold;">WAITING FOR TARGET...</div>
-            </div>
-        </div>
-
-        <div id="report-sidebar">
-            <h3 style="border-bottom: 1px solid var(--glow); padding-bottom: 10px;">SCAN REPORT</h3>
-            <div id="report-list">
-                </div>
+<div id="main-ui">
+    <div id="camera-section">
+        <div class="scan-wave"></div>
+        <video id="webcam" autoplay muted playsinline></video>
+        <canvas id="overlay"></canvas>
+        <div id="hud">
+            <div id="ai-stat">AI SYSTEM: STANDBY</div>
+            <div id="presence-count" style="font-size: 1.2rem; color: var(--guy);">0 TARGETS DETECTED</div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+    <div id="report-sidebar">
+        <h2 style="color: var(--guy); border-bottom: 1px solid #333;">ACTIVITY LOG</h2>
+        <div id="log"></div>
+    </div>
+</div>
 
-    <script>
-        const video = document.getElementById('webcam');
-        const canvas = document.getElementById('overlay');
-        const reportList = document.getElementById('report-list');
-        const targetText = document.getElementById('target');
-        const statusText = document.getElementById('status');
-        const ctx = canvas.getContext('2d');
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+
+<script>
+    const video = document.getElementById('webcam');
+    const canvas = document.getElementById('overlay');
+    const log = document.getElementById('log');
+    const presenceCount = document.getElementById('presence-count');
+    const ctx = canvas.getContext('2d');
+
+    let model;
+    let activeTargets = new Map(); // Tracks what is currently on screen
+
+    async function startScanner() {
+        document.getElementById('boot-screen').style.display = 'none';
+        model = await cocoSsd.load();
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        video.srcObject = stream;
+        video.onloadedmetadata = () => {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            detect();
+        };
+    }
+
+    async function detect() {
+        const predictions = await model.detect(video);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        let model;
-        let lastDetected = "";
+        const currentFrameLabels = new Set();
 
-        async function startSystem() {
-            document.getElementById('start-screen').style.display = 'none';
-            statusText.innerText = "STATUS: LOADING AI BRAIN...";
-            
-            try {
-                model = await cocoSsd.load();
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-                video.srcObject = stream;
-                
-                video.onloadedmetadata = () => {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    statusText.innerText = "STATUS: ACTIVE";
-                    detect();
-                };
-            } catch (err) {
-                alert("Camera access denied or error occurred.");
+        predictions.forEach(p => {
+            const label = p.class;
+            currentFrameLabels.add(label);
+
+            // Draw bounding box
+            ctx.strokeStyle = label === 'person' ? '#00ff88' : '#00e5ff';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(...p.bbox);
+            ctx.fillStyle = ctx.strokeStyle;
+            ctx.fillText(label.toUpperCase(), p.bbox[0], p.bbox[1] > 10 ? p.bbox[1] - 5 : 10);
+
+            // LOGIC: If a person/animal just appeared
+            if (!activeTargets.has(label)) {
+                handleArrival(label);
+            }
+            // Update timestamp of last seen
+            activeTargets.set(label, Date.now());
+        });
+
+        // LOGIC: If a person/animal was here but is now gone (not seen for 2 seconds)
+        for (let [label, lastSeen] of activeTargets) {
+            if (!currentFrameLabels.has(label) && (Date.now() - lastSeen > 2000)) {
+                handleDeparture(label, lastSeen);
+                activeTargets.delete(label);
             }
         }
 
-        async function detect() {
-            const predictions = await model.detect(video);
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        presenceCount.innerText = `${predictions.length} TARGETS IN VIEW`;
+        requestAnimationFrame(detect);
+    }
 
-            if (predictions.length > 0) {
-                const mainObj = predictions[0];
-                targetText.innerText = `TARGET: ${mainObj.class.toUpperCase()}`;
-                
-                // Draw Box
-                ctx.strokeStyle = "#00ff9d";
-                ctx.lineWidth = 4;
-                ctx.strokeRect(mainObj.bbox[0], mainObj.bbox[1], mainObj.bbox[2], mainObj.bbox[3]);
-
-                // Add to report if it's a new unique find in the last few seconds
-                if (mainObj.class !== lastDetected && mainObj.score > 0.65) {
-                    addToReport(mainObj.class, Math.round(mainObj.score * 100));
-                    lastDetected = mainObj.class;
-                }
-            }
-            requestAnimationFrame(detect);
+    function handleArrival(type) {
+        const time = new Date().toLocaleTimeString();
+        const card = document.createElement('div');
+        card.className = 'report-card';
+        
+        let message = `[${time}] ALERT: ${type.toUpperCase()} HAS ARRIVED`;
+        card.innerHTML = `<div class="status-arrival">${message}</div>`;
+        
+        // Add Retail Link for non-human objects
+        if(type !== 'person') {
+            const url = `https://www.google.com/search?q=${type}+price&tbm=shop`;
+            card.innerHTML += `<a href="${url}" target="_blank" class="shop-link">View Retail Details</a>`;
         }
+        
+        log.prepend(card);
+    }
 
-        function addToReport(name, confidence) {
-            const time = new Date().toLocaleTimeString();
-            const entry = document.createElement('div');
-            entry.className = 'report-entry';
-            entry.innerHTML = `
-                <strong>[${time}]</strong><br>
-                OBJECT: ${name.toUpperCase()}<br>
-                RELIABILITY: ${confidence}%<br>
-                <span style="color: #888; font-size: 0.7rem;">Verified by Google Vision Model</span>
-            `;
-            reportList.prepend(entry);
-        }
-    </script>
+    function handleDeparture(type, startTime) {
+        const time = new Date().toLocaleTimeString();
+        const duration = Math.round((Date.now() - startTime) / 1000);
+        const card = document.createElement('div');
+        card.className = 'report-card';
+        
+        card.innerHTML = `
+            <div class="status-departure">[${time}] LOG: ${type.toUpperCase()} HAS DEPARTED</div>
+            <div style="font-size:0.7rem; color:#888;">Total time in view: ${duration} seconds</div>
+        `;
+        log.prepend(card);
+    }
+</script>
 </body>
 </html>

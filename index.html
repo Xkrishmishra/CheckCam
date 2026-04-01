@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Wave Scanner</title>
+    <style>
+        /* CSS - The Look & Animation */
+        body { 
+            margin: 0; 
+            background: #000; 
+            color: #00ffff; 
+            font-family: 'Courier New', Courier, monospace; 
+            overflow: hidden; 
+        }
+        #container { 
+            position: relative; 
+            width: 100vw; 
+            height: 100vh; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        video, canvas { 
+            position: absolute; 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+        }
+        
+        /* The "Wave" Scanner Line */
+        .scanner-line {
+            position: absolute;
+            width: 100%;
+            height: 8px;
+            background: linear-gradient(to bottom, transparent, #00ffff, transparent);
+            box-shadow: 0 0 15px #00ffff;
+            z-index: 10;
+            top: 0;
+            animation: scan-wave 4s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        @keyframes scan-wave {
+            0% { top: 0%; opacity: 0.2; }
+            50% { top: 100%; opacity: 1; }
+            100% { top: 0%; opacity: 0.2; }
+        }
+
+        #info-panel {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 20, 20, 0.8);
+            padding: 20px;
+            border: 1px solid #00ffff;
+            border-radius: 5px;
+            z-index: 20;
+            min-width: 250px;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="container">
+        <div class="scanner-line"></div>
+        <video id="webcam" autoplay muted playsinline></video>
+        <canvas id="overlay"></canvas>
+        <div id="info-panel">Initializing System...</div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+
+    <script>
+        /* JavaScript - The Logic */
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('overlay');
+        const infoPanel = document.getElementById('info-panel');
+        const ctx = canvas.getContext('2d');
+        let model;
+
+        // Start Camera
+        async function init() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment" }, 
+                    audio: false 
+                });
+                video.srcObject = stream;
+                
+                infoPanel.innerText = "Loading Neural Network...";
+                model = await cocoSsd.load();
+                infoPanel.innerText = "Scanner Ready";
+                
+                video.addEventListener('loadeddata', () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    detect();
+                });
+            } catch (err) {
+                infoPanel.innerText = "Error: Camera Access Denied";
+                console.error(err);
+            }
+        }
+
+        // Detection Loop
+        async function detect() {
+            const predictions = await model.detect(video);
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (predictions.length > 0) {
+                predictions.forEach(p => {
+                    // Draw Box
+                    ctx.strokeStyle = "#00ffff";
+                    ctx.lineWidth = 3;
+                    ctx.setLineDash([5, 5]); // Cyberpunk dashed line
+                    ctx.strokeRect(p.bbox[0], p.bbox[1], p.bbox[2], p.bbox[3]);
+                    
+                    // Update Text
+                    infoPanel.innerHTML = `OBJECT: ${p.class.toUpperCase()}<br>CONFIDENCE: ${Math.round(p.score * 100)}%`;
+                });
+            }
+
+            requestAnimationFrame(detect);
+        }
+
+        init();
+    </script>
+</body>
+</html>

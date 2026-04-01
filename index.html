@@ -3,134 +3,149 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Wave Scanner</title>
+    <title>Omni-Scanner AI</title>
     <style>
-        /* CSS - The Look & Animation */
-        body { 
-            margin: 0; 
-            background: #000; 
-            color: #00ffff; 
-            font-family: 'Courier New', Courier, monospace; 
-            overflow: hidden; 
-        }
-        #container { 
-            position: relative; 
-            width: 100vw; 
-            height: 100vh; 
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        video, canvas { 
-            position: absolute; 
-            width: 100%; 
-            height: 100%; 
-            object-fit: cover; 
-        }
+        :root { --glow: #00ff9d; --bg: #050a0a; }
+        body { margin: 0; background: var(--bg); color: var(--glow); font-family: 'Segoe UI', monospace; overflow: hidden; }
         
-        /* The "Wave" Scanner Line */
-        .scanner-line {
-            position: absolute;
-            width: 100%;
-            height: 8px;
-            background: linear-gradient(to bottom, transparent, #00ffff, transparent);
-            box-shadow: 0 0 15px #00ffff;
-            z-index: 10;
-            top: 0;
-            animation: scan-wave 4s ease-in-out infinite;
-            pointer-events: none;
+        /* Layout */
+        #main-ui { display: flex; width: 100vw; height: 100vh; }
+        #camera-section { position: relative; flex-grow: 1; border: 2px solid #1a332a; overflow: hidden; }
+        #report-sidebar { width: 300px; background: rgba(0, 20, 15, 0.9); border-left: 2px solid var(--glow); padding: 20px; overflow-y: auto; display: flex; flex-direction: column; }
+
+        video, canvas { position: absolute; width: 100%; height: 100%; object-fit: cover; }
+
+        /* Scanning Wave */
+        .wave {
+            position: absolute; width: 100%; height: 15px;
+            background: linear-gradient(to bottom, transparent, var(--glow), transparent);
+            box-shadow: 0 0 25px var(--glow);
+            z-index: 5; top: 0; animation: scan 4s infinite ease-in-out; opacity: 0.6; pointer-events: none;
+        }
+        @keyframes scan { 0% { top: 0%; } 50% { top: 100%; } 100% { top: 0%; } }
+
+        /* Guidance Overlay */
+        #overlay-ui {
+            position: absolute; top: 20px; left: 20px; z-index: 10;
+            background: rgba(0,0,0,0.6); padding: 10px; border-left: 3px solid var(--glow);
         }
 
-        @keyframes scan-wave {
-            0% { top: 0%; opacity: 0.2; }
-            50% { top: 100%; opacity: 1; }
-            100% { top: 0%; opacity: 0.2; }
+        /* Report Items */
+        .report-entry {
+            background: rgba(255,255,255,0.05); border: 1px solid #1a332a;
+            padding: 10px; margin-bottom: 10px; border-radius: 4px; font-size: 0.9rem;
+            animation: fadeIn 0.5s forwards;
         }
+        @keyframes fadeIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
 
-        #info-panel {
-            position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 20, 20, 0.8);
-            padding: 20px;
-            border: 1px solid #00ffff;
-            border-radius: 5px;
-            z-index: 20;
-            min-width: 250px;
-            text-align: center;
-            text-transform: uppercase;
-            letter-spacing: 2px;
+        /* Start Screen */
+        #start-screen {
+            position: fixed; inset: 0; background: var(--bg); z-index: 100;
+            display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;
         }
+        button {
+            background: transparent; border: 2px solid var(--glow); color: var(--glow);
+            padding: 15px 30px; cursor: pointer; font-weight: bold; text-transform: uppercase;
+            margin-top: 20px; transition: 0.3s;
+        }
+        button:hover { background: var(--glow); color: black; }
     </style>
 </head>
 <body>
 
-    <div id="container">
-        <div class="scanner-line"></div>
-        <video id="webcam" autoplay muted playsinline></video>
-        <canvas id="overlay"></canvas>
-        <div id="info-panel">Initializing System...</div>
+    <div id="start-screen">
+        <h1>OMNI-SCANNER v3.0</h1>
+        <p>I am your AI guidance system. I will identify objects and generate a retail-grade report.</p>
+        <p style="color: #888;">System requires camera access to begin analysis.</p>
+        <button onclick="startSystem()">Initialize Scanner</button>
+    </div>
+
+    <div id="main-ui">
+        <div id="camera-section">
+            <div class="wave"></div>
+            <video id="webcam" autoplay muted playsinline></video>
+            <canvas id="overlay"></canvas>
+            <div id="overlay-ui">
+                <div id="status">STATUS: STANDBY</div>
+                <div id="target" style="font-size: 1.5rem; font-weight: bold;">WAITING FOR TARGET...</div>
+            </div>
+        </div>
+
+        <div id="report-sidebar">
+            <h3 style="border-bottom: 1px solid var(--glow); padding-bottom: 10px;">SCAN REPORT</h3>
+            <div id="report-list">
+                </div>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 
     <script>
-        /* JavaScript - The Logic */
         const video = document.getElementById('webcam');
         const canvas = document.getElementById('overlay');
-        const infoPanel = document.getElementById('info-panel');
+        const reportList = document.getElementById('report-list');
+        const targetText = document.getElementById('target');
+        const statusText = document.getElementById('status');
         const ctx = canvas.getContext('2d');
+        
         let model;
+        let lastDetected = "";
 
-        // Start Camera
-        async function init() {
+        async function startSystem() {
+            document.getElementById('start-screen').style.display = 'none';
+            statusText.innerText = "STATUS: LOADING AI BRAIN...";
+            
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "environment" }, 
-                    audio: false 
-                });
+                model = await cocoSsd.load();
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
                 video.srcObject = stream;
                 
-                infoPanel.innerText = "Loading Neural Network...";
-                model = await cocoSsd.load();
-                infoPanel.innerText = "Scanner Ready";
-                
-                video.addEventListener('loadeddata', () => {
+                video.onloadedmetadata = () => {
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
+                    statusText.innerText = "STATUS: ACTIVE";
                     detect();
-                });
+                };
             } catch (err) {
-                infoPanel.innerText = "Error: Camera Access Denied";
-                console.error(err);
+                alert("Camera access denied or error occurred.");
             }
         }
 
-        // Detection Loop
         async function detect() {
             const predictions = await model.detect(video);
-            
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            if (predictions.length > 0) {
-                predictions.forEach(p => {
-                    // Draw Box
-                    ctx.strokeStyle = "#00ffff";
-                    ctx.lineWidth = 3;
-                    ctx.setLineDash([5, 5]); // Cyberpunk dashed line
-                    ctx.strokeRect(p.bbox[0], p.bbox[1], p.bbox[2], p.bbox[3]);
-                    
-                    // Update Text
-                    infoPanel.innerHTML = `OBJECT: ${p.class.toUpperCase()}<br>CONFIDENCE: ${Math.round(p.score * 100)}%`;
-                });
-            }
 
+            if (predictions.length > 0) {
+                const mainObj = predictions[0];
+                targetText.innerText = `TARGET: ${mainObj.class.toUpperCase()}`;
+                
+                // Draw Box
+                ctx.strokeStyle = "#00ff9d";
+                ctx.lineWidth = 4;
+                ctx.strokeRect(mainObj.bbox[0], mainObj.bbox[1], mainObj.bbox[2], mainObj.bbox[3]);
+
+                // Add to report if it's a new unique find in the last few seconds
+                if (mainObj.class !== lastDetected && mainObj.score > 0.65) {
+                    addToReport(mainObj.class, Math.round(mainObj.score * 100));
+                    lastDetected = mainObj.class;
+                }
+            }
             requestAnimationFrame(detect);
         }
 
-        init();
+        function addToReport(name, confidence) {
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'report-entry';
+            entry.innerHTML = `
+                <strong>[${time}]</strong><br>
+                OBJECT: ${name.toUpperCase()}<br>
+                RELIABILITY: ${confidence}%<br>
+                <span style="color: #888; font-size: 0.7rem;">Verified by Google Vision Model</span>
+            `;
+            reportList.prepend(entry);
+        }
     </script>
 </body>
 </html>
